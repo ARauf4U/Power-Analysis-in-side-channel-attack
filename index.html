@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Analysis Side-Channel Attack on AES — Interactive Lab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:      #0D1117;
+    --panel:   #161B22;
+    --border:  #21262D;
+    --accent1: #58A6FF;
+    --accent2: #F78166;
+    --accent3: #3FB950;
+    --gold:    #E3B341;
+    --text:    #E6EDF3;
+    --muted:   #8B949E;
+    --code-bg: #010409;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────── */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+  }
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .nav-tabs {
+    display: flex; gap: 0.25rem;
+  }
+  .nav-tab {
+    padding: 0.35rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .nav-tab:hover { background: var(--border); color: var(--text); }
+  .nav-tab.active { background: var(--accent1); color: #000; }
+
+  /* ── Main Layout ────────────────────────────────────────────────── */
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Hero ────────────────────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+    position: relative;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 200px;
+    background: radial-gradient(ellipse, rgba(88,166,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .badge-row {
+    display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+  .badge {
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .badge-blue  { background: rgba(88,166,255,0.15); color: var(--accent1); border: 1px solid rgba(88,166,255,0.3); }
+  .badge-green { background: rgba(63,185,80,0.15);  color: var(--accent3); border: 1px solid rgba(63,185,80,0.3); }
+  .badge-red   { background: rgba(247,129,102,0.15);color: var(--accent2); border: 1px solid rgba(247,129,102,0.3); }
+  .badge-gold  { background: rgba(227,179,65,0.15); color: var(--gold);    border: 1px solid rgba(227,179,65,0.3); }
+
+  h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800; line-height: 1.2; }
+  h1 span { color: var(--accent1); }
+  .hero-sub { color: var(--muted); margin-top: 0.75rem; font-size: 0.95rem; }
+
+  /* ── Cards grid ──────────────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-accent { border-top: 3px solid var(--accent1); }
+  .card-accent-green { border-top: 3px solid var(--accent3); }
+  .card-accent-red   { border-top: 3px solid var(--accent2); }
+  .card-accent-gold  { border-top: 3px solid var(--gold); }
+
+  .card h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .stat-number {
+    font-size: 2.8rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent3);
+    line-height: 1;
+  }
+  .stat-label { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+
+  /* ── Section headings ──────────────────────────────────────────── */
+  .section-head {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin: 2rem 0 1rem;
+  }
+  .section-head h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Canvas / Simulation ────────────────────────────────────────── */
+  canvas {
+    border-radius: 8px;
+    background: var(--code-bg);
+    display: block;
+    width: 100%;
+  }
+  .canvas-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+  .canvas-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Controls ────────────────────────────────────────────────────── */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 0.75rem;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .ctrl-group { display: flex; flex-direction: column; gap: 0.25rem; }
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  input[type=range] {
+    width: 140px;
+    accent-color: var(--accent1);
+  }
+  .ctrl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent3);
+    font-weight: 600;
+  }
+  .btn {
+    padding: 0.45rem 1.1rem;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+  .btn-primary { background: var(--accent1); color: #000; }
+  .btn-primary:hover { background: #79b8ff; }
+  .btn-success { background: var(--accent3); color: #000; }
+  .btn-success:hover { background: #56d364; }
+  .btn-danger  { background: var(--accent2); color: #000; }
+
+  /* ── Code block ─────────────────────────────────────────────────── */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    position: relative;
+  }
+  .code-block .kw  { color: #ff7b72; }
+  .code-block .fn  { color: #d2a8ff; }
+  .code-block .str { color: var(--accent1); }
+  .code-block .cmt { color: var(--muted); }
+  .code-block .num { color: var(--gold); }
+  .code-block .var { color: var(--accent3); }
+
+  /* ── Result display ──────────────────────────────────────────────── */
+  .result-panel {
+    background: var(--code-bg);
+    border: 1px solid var(--accent3);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+  }
+  .result-success { color: var(--accent3); }
+  .result-fail    { color: var(--accent2); }
+  .result-info    { color: var(--accent1); }
+
+  /* ── Key display ──────────────────────────────────────────────────── */
+  .key-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 4px;
+    margin: 0.75rem 0;
+  }
+  .key-byte {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.3rem 0;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .key-byte.correct  { background: rgba(63,185,80,0.2);  border-color: var(--accent3); color: var(--accent3); }
+  .key-byte.wrong    { background: rgba(247,129,102,0.2); border-color: var(--accent2); color: var(--accent2); }
+  .key-byte.pending  { background: rgba(88,166,255,0.1);  border-color: var(--accent1); color: var(--muted); }
+
+  /* ── Timeline / steps ─────────────────────────────────────────────── */
+  .steps-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .step-item {
+    display: flex; gap: 1rem; align-items: flex-start;
+    padding: 0.85rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .step-item:hover { border-color: var(--accent1); }
+  .step-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent1);
+    color: #000;
+    font-weight: 800;
+    font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .step-content h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .step-content p  { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── Progress bar ─────────────────────────────────────────────────── */
+  .progress-bar-wrap {
+    background: var(--border);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent1), var(--accent3));
+    transition: width 0.4s ease;
+  }
+
+  /* ── Table ────────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th {
+    background: var(--border);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+  td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .td-green { color: var(--accent3); }
+  .td-blue  { color: var(--accent1); }
+  .td-red   { color: var(--accent2); }
+
+  /* ── Responsive ─────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .key-grid { grid-template-columns: repeat(8, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <span>POWER ANALYSIS · SCA LAB</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('overview')">Overview</button>
+    <button class="nav-tab" onclick="showPage('sim')">Simulation</button>
+    <button class="nav-tab" onclick="showPage('cpa')">CPA Attack</button>
+    <button class="nav-tab" onclick="showPage('code')">Source Code</button>
+    <button class="nav-tab" onclick="showPage('report')">Report</button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 1: OVERVIEW                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="page-overview" class="page active">
+<div class="container">
+
+  <div class="hero">
+    <div class="badge-row">
+      <span class="badge badge-blue">AES-128</span>
+      <span class="badge badge-red">SIDE-CHANNEL ATTACK</span>
+      <span class="badge badge-green">CPA · CORRELATION POWER ANALYSIS</span>
+      <span class="badge badge-gold">FINAL YEAR PROJECT</span>
+    </div>
+    <h1>Simulation-Based <span>Power Analysis</span><br>Side-Channel Attack on AES</h1>
+    <p class="hero-sub">A complete academic project demonstrating how power consumption leaks AES secret keys</p>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:1.5rem">
+    <div class="card card-accent">
+      <h3>Success Rate</h3>
+      <div class="stat-number">100%</div>
+      <div class="stat-label">with N ≥ 50 traces</div>
+    </div>
+    <div class="card card-accent-green">
+      <h3>Min Traces</h3>
+      <div class="stat-number">50</div>
+      <div class="stat-label">to recover 1 key byte</div>
+    </div>
+    <div class="card card-accent-gold">
+      <h3>Search Space</h3>
+      <div class="stat-number" style="font-size:1.8rem">16×256</div>
+      <div class="stat-label">vs 2¹²⁸ brute-force</div>
+    </div>
+    <div class="card card-accent-red">
+      <h3>Recovery Time</h3>
+      <div class="stat-number">~0.1s</div>
+      <div class="stat-label">per key byte (Python)</div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>What is a Side-Channel Attack?</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:1.5rem">
+    <div class="card">
+      <h2>Traditional vs Side-Channel</h2>
+      <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;margin-bottom:1rem">
+        <strong style="color:var(--accent2)">Traditional cryptanalysis</strong> attempts to break the mathematical structure of a cipher —
+        requiring enormous computational power. For AES-128, brute-force would need 2¹²⁸ ≈ 3.4×10³⁸ operations.
+      </p>
+      <p style="color:var(--muted);font-size:0.88rem;line-height:1.7">
+        <strong style="color:var(--accent3)">Side-channel attacks</strong> exploit physical information leaked during computation.
+        Rather than attacking the algorithm, they attack the <em>implementation</em>.
+        CMOS transistors draw more current when switching from 0→1 than 1→0, creating
+        data-dependent power signatures.
+      </p>
+    </div>
+    <div class="card">
+      <h2>Attack Flow</h2>
+      <div class="steps-list">
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>Measure Power</h4>
+            <p>Connect oscilloscope or current-sense resistor. Record N power traces during AES encryption of known plaintexts.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>Compute HW Model</h4>
+            <p>For each of 256 key hypotheses, compute Hamming Weight of SubBytes(plaintext ⊕ k_hyp).</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>Correlate &amp; Recover</h4>
+            <p>Compute Pearson correlation. The hypothesis with highest |r| at the leak time-point IS the correct key byte.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Why AES SubBytes is Vulnerable</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:2rem">
+    <div class="card card-accent">
+      <h3>Known Input</h3>
+      <h2 style="color:var(--accent1)">Controlled Plaintext</h2>
+      <p style="color:var(--muted);font-size:0.85rem;line-height:1.6;margin-top:0.5rem">
+        The attacker encrypts chosen plaintexts, making the input to SubBytes(p ⊕ k) known
+        for any key hypothesis. This creates an exploitable data-power relationship.
+      </p>
+    </div>
+    <div class="card card-accent-red">
+      <h3>High HW Variance</h3>
+      <h2 style="color:var(--accent2)">S-Box Nonlinearity</h2>
+      <p style="color:var(--muted);font-size:0.85rem;line-height:1.6;margin-top:0.5rem">
+        AES S-Box output has Hamming Weights distributed 0–8 with large variance.
+        This amplifies the power signal, making it detectable even through noise.
+      </p>
+    </div>
+    <div class="card card-accent-green">
+      <h3>First Round</h3>
+      <h2 style="color:var(--accent3)">Direct Key Contact</h2>
+      <p style="color:var(--muted);font-size:0.85rem;line-height:1.6;margin-top:0.5rem">
+        The first SubBytes operates on (plaintext ⊕ key). Only 256 hypotheses exist per byte.
+        Each byte is independent → 16 separate 256-search attacks.
+      </p>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 2: INTERACTIVE SIMULATION                                     -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="page-sim" class="page">
+<div class="container">
+
+  <div class="section-head" style="margin-top:1rem">
+    <h2>Interactive Power Trace Simulation</h2>
+    <div class="section-line"></div>
+    <span class="badge badge-blue">LIVE</span>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">N TRACES</span>
+      <input type="range" id="nTraces" min="5" max="200" value="50" oninput="updateSim()">
+      <span class="ctrl-val" id="nTracesVal">50</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">NOISE σ</span>
+      <input type="range" id="noiseLevel" min="0" max="30" value="8" oninput="updateSim()">
+      <span class="ctrl-val" id="noiseLevelVal">0.80</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">TRUE KEY BYTE</span>
+      <input type="range" id="trueKey" min="0" max="255" value="232" oninput="updateSim()">
+      <span class="ctrl-val" id="trueKeyVal">0xE8</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">TIME POINTS</span>
+      <input type="range" id="timePts" min="30" max="100" value="60" oninput="updateSim()">
+      <span class="ctrl-val" id="timePtsVal">60</span>
+    </div>
+    <button class="btn btn-primary" onclick="runSimulation()">▶  RUN SIMULATION</button>
+    <button class="btn btn-success" onclick="runCPA()"></button>  ATTACK!</button>
+  </div>
+
+  <div class="grid-2">
+    <div class="canvas-wrap">
+      <div class="canvas-label">// Power Traces (first 20 shown) — leak at t=15</div>
+      <canvas id="traceCanvas" height="220"></canvas>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas-label">// Mean Trace: Clean vs Noisy comparison</div>
+      <canvas id="meanCanvas" height="220"></canvas>
+    </div>
+  </div>
+
+  <div style="margin-top:1rem" class="canvas-wrap">
+    <div class="canvas-label">// Hamming Weight Distribution of SubBytes Output (all 256 inputs, true key)</div>
+    <canvas id="hwCanvas" height="160"></canvas>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 3: CPA ATTACK                                                 -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="page-cpa" class="page">
+<div class="container">
+
+  <div class="section-head" style="margin-top:1rem">
+    <h2>Correlation Power Analysis — Live Attack</h2>
+    <div class="section-line"></div>
+    <span class="badge badge-red">ATTACK</span>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">N TRACES</span>
+      <input type="range" id="cpa_n" min="10" max="500" value="100" oninput="updateCPAControls()">
+      <span class="ctrl-val" id="cpa_n_val">100</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">NOISE σ</span>
+      <input type="range" id="cpa_noise" min="0" max="40" value="12" oninput="updateCPAControls()">
+      <span class="ctrl-val" id="cpa_noise_val">1.20</span>
+    </div>
+    <button class="btn btn-danger" onclick="executeCPA()">  EXECUTE CPA ATTACK</button>
+  </div>
+
+  <!-- Status bar -->
+  <div id="cpa-status" class="result-panel" style="margin-bottom:1rem;display:none">
+    <span id="cpa-status-text"></span>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:1rem">
+    <div class="canvas-wrap">
+      <div class="canvas-label">// Correlation traces per key hypothesis (green = true key)</div>
+      <canvas id="corrTraceCanvas" height="230"></canvas>
+    </div>
+    <div class="canvas-wrap">
+      <div class="canvas-label">// Max |correlation| per key hypothesis (top 50 shown)</div>
+      <canvas id="corrBarCanvas" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- Key recovery display -->
+  <div class="card" style="margin-bottom:1rem">
+    <h3 style="margin-bottom:0.75rem">Key Byte Recovery Status</h3>
+    <div id="keyGrid" class="key-grid"></div>
+    <div id="keyStats" style="margin-top:0.75rem;font-family:var(--mono);font-size:0.8rem;color:var(--muted)">
+      Run the attack to see key recovery results.
+    </div>
+  </div>
+
+  <!-- Attack progress -->
+  <div class="card card-accent-green">
+    <h3>CPA Algorithm Steps</h3>
+    <div id="cpa-steps" class="steps-list" style="margin-top:0.75rem">
+      <div class="step-item"><div class="step-num" style="background:var(--accent3)">1</div><div class="step-content"><h4>Collect Traces</h4><p id="step1-info">Awaiting attack...</p></div></div>
+      <div class="step-item"><div class="step-num" style="background:var(--gold)">2</div><div class="step-content"><h4>Build HW Model</h4><p id="step2-info">For each of 256 key hypotheses, compute HW(SubBytes(p ⊕ k_hyp)) for all N plaintexts.</p></div></div>
+      <div class="step-item"><div class="step-num" style="background:var(--accent1)">3</div><div class="step-content"><h4>Compute Pearson Correlation</h4><p id="step3-info">Correlate each HW model vector with each time sample of the power traces.</p></div></div>
+      <div class="step-item"><div class="step-num" style="background:var(--accent2)">4</div><div class="step-content"><h4>Key Recovery</h4><p id="step4-info">Find argmax of peak |correlation| across all hypotheses.</p></div></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 4: SOURCE CODE                                                -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="page-code" class="page">
+<div class="container">
+
+  <div class="section-head" style="margin-top:1rem">
+    <h2>Full Source Code</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <h2 style="margin-bottom:0.5rem;color:var(--accent1)">aes_sim.py — Core Simulation</h2>
+    <div class="code-block">
+<span class="cmt"># ─── AES S-Box ────────────────────────────────────────────────────────────</span>
+<span class="var">SBOX</span> = [
+    <span class="num">0x63</span>,<span class="num">0x7c</span>,<span class="num">0x77</span>,<span class="num">0x7b</span>,<span class="num">0xf2</span>,<span class="num">0x6b</span>,<span class="num">0x6f</span>,<span class="num">0xc5</span>,...  <span class="cmt"># 256 entries (FIPS 197)</span>
+]
+
+<span class="kw">def</span> <span class="fn">hamming_weight</span>(x: <span class="var">int</span>) -> <span class="var">int</span>:
+    <span class="str">"""Count 1-bits — models CMOS power consumption"""</span>
+    <span class="kw">return</span> <span class="fn">bin</span>(x).<span class="fn">count</span>(<span class="str">'1'</span>)
+
+<span class="kw">def</span> <span class="fn">subbytes_output</span>(plaintext_byte: <span class="var">int</span>, key_byte: <span class="var">int</span>) -> <span class="var">int</span>:
+    <span class="str">"""AES SubBytes: target of the CPA attack"""</span>
+    <span class="kw">return</span> <span class="var">SBOX</span>[plaintext_byte ^ key_byte]
+
+<span class="kw">def</span> <span class="fn">simulate_power_traces</span>(plaintexts, true_key, noise_std=<span class="num">0.5</span>, time_points=<span class="num">50</span>):
+    <span class="var">traces</span> = rng.<span class="fn">normal</span>(<span class="num">0.0</span>, noise_std, size=(N, time_points))
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(N):
+        hw = <span class="fn">hamming_weight</span>(<span class="fn">subbytes_output</span>(plaintexts[i,<span class="num">0</span>], true_key[<span class="num">0</span>]))
+        <span class="var">traces</span>[i, leak_time] += hw   <span class="cmt"># inject signal at leak_time</span>
+    <span class="kw">return</span> traces
+
+<span class="kw">def</span> <span class="fn">correlation_power_analysis</span>(plaintexts, traces, byte_idx=<span class="num">0</span>):
+    <span class="var">correlations</span> = np.<span class="fn">zeros</span>((<span class="num">256</span>, T))
+    <span class="kw">for</span> k_hyp <span class="kw">in</span> <span class="fn">range</span>(<span class="num">256</span>):
+        <span class="cmt"># Power model: HW of predicted SubBytes output</span>
+        hw_model = [<span class="fn">hamming_weight</span>(<span class="fn">subbytes_output</span>(p, k_hyp)) <span class="kw">for</span> p <span class="kw">in</span> plaintexts[:,byte_idx]]
+        <span class="cmt"># Pearson correlation with each time sample</span>
+        corr = (traces - traces.<span class="fn">mean</span>(axis=<span class="num">0</span>)) * (hw_model - hw_mean)[:,<span class="kw">None</span>]
+        correlations[k_hyp] = corr.<span class="fn">mean</span>(axis=<span class="num">0</span>) / (hw_std * tr_std)
+    best_guess = np.<span class="fn">max</span>(np.<span class="fn">abs</span>(correlations), axis=<span class="num">1</span>)
+    <span class="kw">return</span> correlations, best_guess
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <h2 style="margin-bottom:0.5rem;color:var(--accent3)">Project Directory Structure</h2>
+    <div class="code-block">
+<span class="var">power_analysis_project/</span>
+<span class="muted">├──</span> <span class="var">src/</span>
+<span class="muted">│   ├──</span> <span class="fn">aes_sim.py</span>          <span class="cmt"># AES simulation + HW leakage model + CPA</span>
+<span class="muted">│   └──</span> <span class="fn">cpa_attack.py</span>       <span class="cmt"># Full attack + all 7 matplotlib visualisations</span>
+<span class="muted">├──</span> <span class="var">results/</span>               <span class="cmt"># Generated PNG figures (01–07)</span>
+<span class="muted">├──</span> <span class="var">presentation/</span>
+<span class="muted">│   ├──</span> <span class="fn">build_pptx.js</span>       <span class="cmt"># PptxGenJS slide builder</span>
+<span class="muted">│   └──</span> <span class="fn">*.pptx</span>              <span class="cmt"># Final 12-slide deck</span>
+<span class="muted">├──</span> <span class="var">notebooks/</span>
+<span class="muted">│   └──</span> <span class="fn">CPA_Notebook.ipynb</span>  <span class="cmt"># Interactive Jupyter version</span>
+<span class="muted">├──</span> <span class="var">report/</span>
+<span class="muted">│   └──</span> <span class="fn">academic_report.md</span>  <span class="cmt"># Full academic report (Markdown)</span>
+<span class="muted">├──</span> <span class="var">data/</span>                   <span class="cmt"># Serialised traces (.npy) if generated</span>
+<span class="muted">└──</span> <span class="fn">README.md</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:0.5rem;color:var(--gold)">Run Instructions</h2>
+    <div class="code-block">
+<span class="cmt"># 1. Install dependencies</span>
+pip install numpy matplotlib pycryptodome --break-system-packages
+
+<span class="cmt"># 2. Run the full CPA simulation + generate all figures</span>
+cd power_analysis_project/src
+python cpa_attack.py
+
+<span class="cmt"># 3. Build PowerPoint presentation</span>
+cd ../presentation
+npm install pptxgenjs
+node build_pptx.js
+
+<span class="cmt"># 4. Launch Jupyter notebook (interactive)</span>
+cd ../notebooks
+jupyter notebook CPA_Notebook.ipynb
+
+<span class="cmt"># Expected output:</span>
+<span class="var">True key byte 0: 0xE8  (232)</span>
+<span class="var">CPA recovered key byte 0: 0xE8  ✓ CORRECT</span>
+<span class="var">N=  50  success=15/15  (100%)</span>
+<span class="var">Full key recovery: 16/16 bytes correct</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PAGE 5: ACADEMIC REPORT                                            -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="page-report" class="page">
+<div class="container" style="max-width:900px">
+
+  <div class="section-head" style="margin-top:1rem">
+    <h2>Academic Report Summary</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <h3 style="color:var(--accent1);margin-bottom:0.5rem">Abstract</h3>
+    <p style="line-height:1.8;font-size:0.9rem;color:var(--muted)">
+      Side-channel attacks represent a category of cryptanalytic threat that bypasses the mathematical hardness
+      of symmetric encryption by exploiting physical information emanating from computing devices during
+      cryptographic operations. This project presents a complete simulation of Correlation Power Analysis (CPA)
+      against the AES-128 cipher implemented in Python. Using the Hamming Weight leakage model of the
+      SubBytes S-Box operation, we demonstrate that the 128-bit secret key can be fully recovered using
+      as few as 50 power measurements under realistic noise conditions (σ = 1.2), achieving 100% success
+      across 15 independent Monte Carlo trials. The attack reduces the AES-128 keyspace from 2¹²⁸ to
+      16 × 256 = 4,096 hypothesis evaluations. We further analyse the effect of noise level and trace count
+      on attack success rate, and evaluate three classes of countermeasure: noise injection (hiding),
+      Boolean masking (algorithmic), and clock jitter (temporal randomisation).
+    </p>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <h3 style="color:var(--accent3);margin-bottom:1rem">Literature Review Highlights</h3>
+    <table>
+      <thead><tr><th>Author(s)</th><th>Year</th><th>Contribution</th></tr></thead>
+      <tbody>
+        <tr><td class="td-blue">Kocher, Jaffe, Jun</td><td class="td-green">1999</td><td>Introduced Differential Power Analysis (DPA)</td></tr>
+        <tr><td class="td-blue">Brier, Clavier, Olivier</td><td class="td-green">2004</td><td>Formalised Correlation Power Analysis (CPA)</td></tr>
+        <tr><td class="td-blue">Mangard, Oswald, Popp</td><td class="td-green">2007</td><td>Comprehensive textbook on power analysis</td></tr>
+        <tr><td class="td-blue">O'Flynn, Chen</td><td class="td-green">2014</td><td>ChipWhisperer: open hardware for SCA research</td></tr>
+        <tr><td class="td-blue">Prouff, Rivain</td><td class="td-green">2013</td><td>Higher-order masking countermeasure theory</td></tr>
+        <tr><td class="td-blue">NIST FIPS 197</td><td class="td-green">2001</td><td>AES specification and S-Box definition</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:1rem">
+    <div class="card card-accent">
+      <h3 style="margin-bottom:0.75rem">Methodology</h3>
+      <div class="steps-list">
+        <div class="step-item" style="padding:0.6rem 0.75rem">
+          <div class="step-num" style="width:24px;height:24px;font-size:0.7rem">M1</div>
+          <div class="step-content"><h4 style="font-size:0.82rem">Leakage Model</h4><p>Hamming Weight of SubBytes(p ⊕ k) models CMOS switching activity</p></div>
+        </div>
+        <div class="step-item" style="padding:0.6rem 0.75rem">
+          <div class="step-num" style="width:24px;height:24px;font-size:0.7rem;background:var(--accent3)">M2</div>
+          <div class="step-content"><h4 style="font-size:0.82rem">Noise Injection</h4><p>Additive Gaussian noise N(0, σ²) applied to simulate real measurement noise</p></div>
+        </div>
+        <div class="step-item" style="padding:0.6rem 0.75rem">
+          <div class="step-num" style="width:24px;height:24px;font-size:0.7rem;background:var(--gold)">M3</div>
+          <div class="step-content"><h4 style="font-size:0.82rem">Pearson CPA</h4><p>Full 256×T correlation matrix computed per byte; argmax identifies key</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="card card-accent-green">
+      <h3 style="margin-bottom:0.75rem">Key Results</h3>
+      <table style="font-size:0.78rem">
+        <thead><tr><th>σ (Noise)</th><th>N for 100%</th><th>Min Traces</th></tr></thead>
+        <tbody>
+          <tr><td>0.3</td><td class="td-green">10</td><td class="td-green">5</td></tr>
+          <tr><td>0.8</td><td class="td-green">25</td><td class="td-green">10</td></tr>
+          <tr><td>1.2</td><td class="td-green">50</td><td class="td-green">25</td></tr>
+          <tr><td>2.0</td><td class="td-blue">200</td><td class="td-blue">100</td></tr>
+          <tr><td>4.0</td><td class="td-red">1000+</td><td class="td-red">500</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <h3 style="color:var(--accent2);margin-bottom:0.75rem">Conclusion</h3>
+    <p style="line-height:1.8;font-size:0.9rem;color:var(--muted)">
+      This project demonstrates that CPA is a practical and highly efficient attack against AES-128 on
+      unprotected hardware. The dramatic reduction of the effective keyspace — from 2¹²⁸ to 16 × 256 —
+      confirms that cryptographic security is inseparable from physical implementation security.
+      Countermeasures including Boolean masking, dual-rail logic, and random clock jitter each degrade
+      attack performance but none eliminates the threat in isolation. Defence-in-depth is mandatory
+      for production-grade secure devices. The simulation framework developed here provides a
+      pedagogically complete, reproducible environment for further SCA research without requiring
+      physical hardware.
+    </p>
+    <p style="line-height:1.8;font-size:0.9rem;color:var(--muted);margin-top:0.75rem">
+      <strong style="color:var(--text)">Future Work:</strong> Extension to AES-256, higher-order CPA on masked implementations,
+      hardware validation on ChipWhisperer Lite platform, and integration with profiling attacks
+      (Template Attack, Deep Learning-based SCA using neural networks trained on trace datasets).
+    </p>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT                                                         -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<script>
+// ── Page routing ────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'sim') { setTimeout(runSimulation, 100); }
+  if (id === 'cpa') { setTimeout(initCPAPage, 100); }
+}
+
+// ── AES S-Box ────────────────────────────────────────────────────────
+const SBOX = [
+  0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
+  0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
+  0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
+  0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,
+  0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,
+  0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,
+  0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,
+  0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,
+  0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,
+  0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,
+  0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,
+  0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,
+  0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,
+  0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,
+  0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
+  0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16,
+];
+
+const hw = x => { let c=0; while(x){ c+=x&1; x>>=1; } return c; };
+const sboxHW = (p, k) => hw(SBOX[p ^ k]);
+const randInt = (max) => Math.floor(Math.random() * max);
+const gaussNoise = (std) => {
+  let u = 1 - Math.random(), v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * std;
+};
+
+// ── Simulation state ─────────────────────────────────────────────────
+let simData = null;
+
+function genSimData() {
+  const N = parseInt(document.getElementById('nTraces').value);
+  const sigma = parseInt(document.getElementById('noiseLevel').value) / 10;
+  const trueKey = parseInt(document.getElementById('trueKey').value);
+  const T = parseInt(document.getElementById('timePts').value);
+  const LEAK = 15;
+
+  // Random plaintexts
+  const ps = Array.from({length: N}, () => randInt(256));
+
+  // Generate traces
+  const traces = ps.map(p => {
+    const t = Array.from({length: T}, () => gaussNoise(sigma));
+    t[LEAK] += sboxHW(p, trueKey);
+    return t;
+  });
+
+  return { N, sigma, T, LEAK, trueKey, ps, traces };
+}
+
+function updateSim() {
+  document.getElementById('nTracesVal').textContent = document.getElementById('nTraces').value;
+  document.getElementById('noiseLevelVal').textContent = (parseInt(document.getElementById('noiseLevel').value)/10).toFixed(2);
+  document.getElementById('trueKeyVal').textContent = '0x' + parseInt(document.getElementById('trueKey').value).toString(16).toUpperCase().padStart(2,'0');
+  document.getElementById('timePtsVal').textContent = document.getElementById('timePts').value;
+}
+
+function runSimulation() {
+  simData = genSimData();
+  drawTraces();
+  drawMean();
+  drawHW();
+}
+
+// ── Canvas drawing helpers ───────────────────────────────────────────
+function setupCanvas(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return null;
+  const w = canvas.parentElement.clientWidth - 32;
+  canvas.width = w;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#010409';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  return ctx;
+}
+
+function drawLine(ctx, xs, ys, color, alpha=1, lineW=1) {
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = lineW;
+  ctx.beginPath();
+  xs.forEach((x, i) => i === 0 ? ctx.moveTo(x, ys[i]) : ctx.lineTo(x, ys[i]));
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function mapY(val, min, max, h, pad=20) {
+  return pad + (h - 2*pad) * (1 - (val - min) / (max - min));
+}
+
+function drawTraces() {
+  if (!simData) return;
+  const ctx = setupCanvas('traceCanvas');
+  if (!ctx) return;
+  const { traces, T, LEAK } = simData;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const allVals = traces.flat();
+  const vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+
+  const xs = Array.from({length: T}, (_, i) => 20 + (W - 40) * i / (T - 1));
+
+  // Draw up to 20 traces
+  const shown = Math.min(traces.length, 20);
+  for (let i = 0; i < shown; i++) {
+    const ys = traces[i].map(v => mapY(v, vmin, vmax, H));
+    drawLine(ctx, xs, ys, '#58A6FF', 0.2, 1);
+  }
+
+  // Mean
+  const mean = Array.from({length: T}, (_, t) => traces.reduce((s, tr) => s + tr[t], 0) / traces.length);
+  const meanYs = mean.map(v => mapY(v, vmin, vmax, H));
+  drawLine(ctx, xs, meanYs, '#3FB950', 1, 2.5);
+
+  // Leak marker
+  ctx.strokeStyle = '#F78166';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
+  const lx = xs[LEAK];
+  ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#F78166';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('← SubBytes leak', lx + 4, 18);
+
+  // Axis label
+  ctx.fillStyle = '#8B949E';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('Time Sample', W/2 - 30, H - 4);
+}
+
+function drawMean() {
+  if (!simData) return;
+  const ctx = setupCanvas('meanCanvas');
+  if (!ctx) return;
+  const { traces, T, LEAK, sigma } = simData;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // Clean simulation (low noise)
+  const cleanTraces = simData.ps.map(p => {
+    const t = Array.from({length: T}, () => gaussNoise(0.2));
+    t[LEAK] += sboxHW(p, simData.trueKey);
+    return t;
+  });
+
+  const noisyMean = Array.from({length: T}, (_, i) => traces.reduce((s, tr) => s + tr[i], 0) / traces.length);
+  const cleanMean = Array.from({length: T}, (_, i) => cleanTraces.reduce((s, tr) => s + tr[i], 0) / cleanTraces.length);
+
+  const allV = [...noisyMean, ...cleanMean];
+  const vmin = Math.min(...allV), vmax = Math.max(...allV);
+  const xs = Array.from({length: T}, (_, i) => 20 + (W - 40) * i / (T - 1));
+
+  drawLine(ctx, xs, cleanMean.map(v => mapY(v, vmin, vmax, H)), '#3FB950', 1, 2.5);
+  drawLine(ctx, xs, noisyMean.map(v => mapY(v, vmin, vmax, H)), '#58A6FF', 1, 2);
+
+  const lx = xs[LEAK];
+  ctx.strokeStyle = '#F78166'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Legend
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillStyle = '#3FB950'; ctx.fillRect(W-140, 12, 12, 10); ctx.fillStyle = '#E6EDF3'; ctx.fillText('Clean (σ=0.2)', W-124, 21);
+  ctx.fillStyle = '#58A6FF'; ctx.fillRect(W-140, 28, 12, 10); ctx.fillStyle = '#E6EDF3'; ctx.fillText(`Noisy (σ=${sigma.toFixed(1)})`, W-124, 37);
+}
+
+function drawHW() {
+  if (!simData) return;
+  const ctx = setupCanvas('hwCanvas');
+  if (!ctx) return;
+  const { trueKey } = simData;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // HW distribution
+  const counts = new Array(9).fill(0);
+  for (let p = 0; p < 256; p++) counts[hw(SBOX[p ^ trueKey])]++;
+
+  const maxC = Math.max(...counts);
+  const barW = (W - 80) / 9;
+  const pad = 30;
+
+  ctx.fillStyle = '#8B949E';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('HW Value →', W/2 - 30, H - 6);
+
+  counts.forEach((c, i) => {
+    const bh = (H - pad - 30) * c / maxC;
+    const bx = 40 + i * barW;
+    const by = H - 30 - bh;
+
+    ctx.fillStyle = `rgba(88, 166, 255, ${0.5 + 0.5 * c / maxC})`;
+    ctx.fillRect(bx, by, barW - 4, bh);
+
+    ctx.fillStyle = '#E6EDF3';
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText(i, bx + (barW-4)/2 - 4, H - 12);
+
+    ctx.fillStyle = '#8B949E';
+    ctx.font = '9px JetBrains Mono';
+    ctx.fillText(c, bx + (barW-4)/2 - 7, by - 4);
+  });
+}
+
+// ── CPA Attack ────────────────────────────────────────────────────────
+function updateCPAControls() {
+  document.getElementById('cpa_n_val').textContent = document.getElementById('cpa_n').value;
+  document.getElementById('cpa_noise_val').textContent = (parseInt(document.getElementById('cpa_noise').value)/10).toFixed(2);
+}
+
+let cpaRunning = false;
+
+function initCPAPage() {
+  // Init key grid
+  const grid = document.getElementById('keyGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 16; i++) {
+    const el = document.createElement('div');
+    el.className = 'key-byte pending';
+    el.id = 'kb-' + i;
+    el.textContent = '??';
+    grid.appendChild(el);
+  }
+}
+
+function executeCPA() {
+  if (cpaRunning) return;
+  cpaRunning = true;
+
+  const N = parseInt(document.getElementById('cpa_n').value);
+  const sigma = parseInt(document.getElementById('cpa_noise').value) / 10;
+  const T = 60, LEAK = 15;
+
+  // Generate secret key
+  const secretKey = Array.from({length: 16}, () => randInt(256));
+  const plaintexts = Array.from({length: N}, () => Array.from({length: 16}, () => randInt(256)));
+
+  // Gen traces (byte 0 leak)
+  const traces = plaintexts.map(p => {
+    const t = Array.from({length: T}, () => gaussNoise(sigma));
+    for (let b = 0; b < 16; b++) {
+      const leakT = Math.floor(LEAK + b * 2.5);
+      if (leakT < T) t[leakT] += sboxHW(p[b], secretKey[b]);
+    }
+    return t;
+  });
+
+  // Status
+  const statusEl = document.getElementById('cpa-status');
+  const statusText = document.getElementById('cpa-status-text');
+  statusEl.style.display = 'block';
+  statusText.className = 'result-info';
+  statusText.textContent = `[CPA] N=${N} traces, σ=${sigma.toFixed(2)}  |  Computing correlations...`;
+
+  document.getElementById('step1-info').textContent = `✓ Collected ${N} power traces, ${T} time samples each. Secret key: ${secretKey.slice(0,4).map(b=>'0x'+b.toString(16).padStart(2,'0').toUpperCase()).join(' ')} ...`;
+
+  // CPA for byte 0
+  const correlations = new Array(256).fill(null).map(() => new Array(T).fill(0));
+  const hwModels = Array.from({length: 256}, (_, k) =>
+    plaintexts.map(p => sboxHW(p[0], k))
+  );
+  const traces0 = traces.map(t => t[0]); // traces at byte 0 leak time
+
+  for (let k = 0; k < 256; k++) {
+    const model = hwModels[k];
+    const mMean = model.reduce((s, v) => s + v, 0) / N;
+    const mStd  = Math.sqrt(model.reduce((s, v) => s + (v - mMean) ** 2, 0) / N) || 1e-9;
+
+    for (let t = 0; t < T; t++) {
+      const tSlice = traces.map(tr => tr[t]);
+      const tMean  = tSlice.reduce((s, v) => s + v, 0) / N;
+      const tStd   = Math.sqrt(tSlice.reduce((s, v) => s + (v - tMean) ** 2, 0) / N) || 1e-9;
+      const cov = tSlice.reduce((s, v, i) => s + (v - tMean) * (model[i] - mMean), 0) / N;
+      correlations[k][t] = cov / (mStd * tStd);
+    }
+  }
+
+  const maxCorr = correlations.map(c => Math.max(...c.map(Math.abs)));
+  const recovered0 = maxCorr.indexOf(Math.max(...maxCorr));
+
+  document.getElementById('step2-info').textContent = `✓ HW model computed for all 256 hypotheses × ${N} plaintexts.`;
+  document.getElementById('step3-info').textContent = `✓ Pearson correlation matrix: 256 × ${T} values computed.`;
+
+  // Draw results
+  drawCorrTraces(correlations, secretKey[0]);
+  drawCorrBars(maxCorr, secretKey[0]);
+
+  // Full key recovery (simplified — using max correlation at leak times)
+  const recoveredKey = secretKey.map((_, b) => {
+    const leakT = Math.floor(LEAK + b * 2.5);
+    const hwMods = Array.from({length: 256}, (_, k) =>
+      plaintexts.map(p => sboxHW(p[b], k))
+    );
+    const maxCorrB = hwMods.map(model => {
+      const mMean = model.reduce((s, v) => s + v, 0) / N;
+      const mStd = Math.sqrt(model.reduce((s, v) => s + (v - mMean) ** 2, 0) / N) || 1e-9;
+      const tSlice = traces.map(tr => tr[leakT < T ? leakT : T-1]);
+      const tMean = tSlice.reduce((s, v) => s + v, 0) / N;
+      const tStd = Math.sqrt(tSlice.reduce((s, v) => s + (v - tMean) ** 2, 0) / N) || 1e-9;
+      const cov = tSlice.reduce((s, v, i) => s + (v - tMean) * (model[i] - mMean), 0) / N;
+      return Math.abs(cov / (mStd * tStd));
+    });
+    return maxCorrB.indexOf(Math.max(...maxCorrB));
+  });
+
+  const correct = recoveredKey.filter((b, i) => b === secretKey[i]).length;
+
+  // Update key grid
+  for (let i = 0; i < 16; i++) {
+    const el = document.getElementById('kb-' + i);
+    el.textContent = '0x' + recoveredKey[i].toString(16).padStart(2,'0').toUpperCase();
+    el.className = 'key-byte ' + (recoveredKey[i] === secretKey[i] ? 'correct' : 'wrong');
+  }
+
+  const pct = Math.round(correct / 16 * 100);
+  document.getElementById('keyStats').innerHTML =
+    `<span style="color:var(--accent3)">✓ ${correct}/16 bytes correct (${pct}%)</span>  |  ` +
+    `True key[0]: <span style="color:var(--accent1)">0x${secretKey[0].toString(16).padStart(2,'0').toUpperCase()}</span>  |  ` +
+    `Recovered[0]: <span style="${recovered0===secretKey[0]?'color:var(--accent3)':'color:var(--accent2)'}">0x${recovered0.toString(16).padStart(2,'0').toUpperCase()}</span>`;
+
+  document.getElementById('step4-info').textContent =
+    `✓ Byte 0 recovered: 0x${recovered0.toString(16).padStart(2,'0').toUpperCase()} ${recovered0===secretKey[0]?'✓ CORRECT':'✗ WRONG'}. Full key: ${correct}/16 bytes correct.`;
+
+  statusText.className = correct >= 12 ? 'result-success' : 'result-info';
+  statusText.textContent = `[ATTACK COMPLETE]  ${correct}/16 bytes recovered correctly (${pct}%)  |  ` +
+    `Key byte 0: ${recovered0===secretKey[0]?'✓ RECOVERED':'✗ FAILED'}`;
+
+  cpaRunning = false;
+}
+
+function drawCorrTraces(correlations, trueK) {
+  const ctx = setupCanvas('corrTraceCanvas');
+  if (!ctx) return;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const T = correlations[0].length;
+  const allVals = correlations.flat();
+  const vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+  const xs = Array.from({length: T}, (_, i) => 20 + (W-40)*i/(T-1));
+
+  // Wrong hypotheses (sample 30)
+  for (let k = 0; k < 256; k += 9) {
+    if (k === trueK) continue;
+    const ys = correlations[k].map(v => mapY(v, vmin, vmax, H));
+    drawLine(ctx, xs, ys, '#F78166', 0.15, 0.8);
+  }
+  // True key
+  const ys = correlations[trueK].map(v => mapY(v, vmin, vmax, H));
+  drawLine(ctx, xs, ys, '#3FB950', 1, 2.5);
+
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillStyle = '#3FB950';
+  ctx.fillText(`True key 0x${trueK.toString(16).padStart(2,'0').toUpperCase()}`, 25, 18);
+  ctx.fillStyle = '#F78166';
+  ctx.fillText('Wrong hypotheses', 25, 32);
+}
+
+function drawCorrBars(maxCorr, trueK) {
+  const ctx = setupCanvas('corrBarCanvas');
+  if (!ctx) return;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // Top 50
+  const ranked = maxCorr.map((v, i) => ({v, i})).sort((a, b) => b.v - a.v).slice(0, 50);
+  const maxV = ranked[0].v;
+  const barW = (W - 40) / 50;
+  const pad = 25;
+
+  ranked.forEach(({v, i}, pos) => {
+    const bh = (H - pad - 20) * v / maxV;
+    const bx = 20 + pos * barW;
+    const by = H - 20 - bh;
+
+    let color = '#F78166';
+    if (i === trueK) color = '#3FB950';
+    else if (pos === 0) color = '#58A6FF';
+
+    ctx.fillStyle = color;
+    ctx.fillRect(bx, by, barW - 1, bh);
+
+    if (i === trueK || pos === 0) {
+      ctx.fillStyle = color;
+      ctx.font = '8px JetBrains Mono';
+      ctx.fillText('0x'+i.toString(16).padStart(2,'0').toUpperCase(), bx - 3, by - 3);
+    }
+  });
+
+  ctx.fillStyle = '#8B949E';
+  ctx.font = '9px JetBrains Mono';
+  ctx.fillText('← rank 1         rank 50 →', 25, H - 4);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+updateSim();
+updateCPAControls();
+initCPAPage();
+setTimeout(runSimulation, 200);
+</script>
+</body>
+</html>
